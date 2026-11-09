@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>بوابة متابعة وسداد الأقساط الذكية</title>
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&display=swap" rel="stylesheet">
+<style>
+  body { font-family: 'Cairo', sans-serif; background: #0f172a; color: #f8fafc; margin: 0; padding: 16px; }
+  .container { max-width: 520px; margin: 0 auto; }
+  .card { background: #1e293b; border: 1px solid #334155; border-radius: 16px; padding: 20px; margin-bottom: 16px; box-shadow: 0 8px 24px rgba(0,0,0,0.3); }
+  h1, h2, h3 { margin-top: 0; color: #10b981; }
+  .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 14px 0; }
+  .stat-box { background: #0f172a; padding: 12px; border-radius: 12px; text-align: center; border: 1px solid #334155; }
+  .stat-val { font-size: 20px; font-weight: 900; color: #10b981; }
+  .stat-lbl { font-size: 12px; color: #94a3b8; }
+  input, select { width: 100%; box-sizing: border-box; padding: 12px; border-radius: 10px; border: 1px solid #475569; background: #0f172a; color: white; font-family: 'Cairo', sans-serif; font-size: 15px; margin-bottom: 12px; }
+  button { width: 100%; padding: 12px; border-radius: 10px; border: none; background: #10b981; color: white; font-family: 'Cairo', sans-serif; font-size: 16px; font-weight: 700; cursor: pointer; }
+  button:hover { background: #059669; }
+  button:disabled { background: #475569; cursor: not-allowed; }
+  .inst-row { background: #0f172a; border-right: 4px solid #10b981; padding: 12px; border-radius: 10px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+  .inst-late { border-right-color: #ef4444; }
+  .inst-pending { border-right-color: #f59e0b; }
+  .badge { padding: 6px 12px; border-radius: 99px; font-size: 12px; font-weight: bold; display: inline-block; white-space: nowrap; }
+  .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0, 0, 0, 0.85); z-index: 9999; align-items: center; justify-content: center; padding: 16px; }
+  .modal-box { background: #1e293b; border: 2px solid #10b981; border-radius: 18px; width: 100%; max-width: 420px; padding: 22px; }
+  .msg-banner { display: none; padding: 12px; border-radius: 10px; margin-bottom: 12px; font-size: 14px; font-weight: bold; text-align: center; line-height: 1.6; }
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="card" style="text-align:center;">
+    <h2 id="storeTitle">🏪 I SMILE TECH</h2>
+    <p style="color:#94a3b8; font-size:13px; margin:0;" id="storeSub">بوابة متابعة وسداد الأقساط الذكية 📞 01278922019</p>
+  </div>
+
+  <div id="topBanner" class="msg-banner"></div>
+
+  <div class="card" id="loginBox">
+    <h3>🔍 استعلام عن الأقساط المتبقية</h3>
+    <input type="tel" id="phoneInput" placeholder="أدخل رقم هاتفك المسجل لدى المعرض..." />
+    <button type="button" onclick="lookupCustomer()">عرض كشف حسابي والأقساط المتبقية</button>
+  </div>
+
+  <div id="resultArea" style="display:none;">
+    <div class="card">
+      <h3 id="custNameTitle" style="text-align:center;">مرحباً بك</h3>
+      <div class="stat-grid">
+        <div class="stat-box">
+          <div class="stat-val" id="remCountVal">0</div>
+          <div class="stat-lbl">عدد الأقساط المتبقية</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-val" style="color:#f59e0b;" id="remMoneyVal">0 ج.م</div>
+          <div class="stat-lbl">إجمالي المبلغ المتبقي</div>
+        </div>
+      </div>
+      <div id="payInfoBox" style="background:#064e3b; padding:12px; border-radius:10px; font-size:13px; text-align:center; line-height:1.7;"></div>
+    </div>
+
+    <div class="card">
+      <h3>📅 جدول الأقساط ومواعيدها</h3>
+      <div id="instList"></div>
+    </div>
+  </div>
+</div>
+
+<!-- نافذة الدفع والتحقق الصارم من رقم المحفظة -->
+<div class="modal-overlay" id="payModal">
+  <div class="modal-box">
+    <h3 style="text-align:center; margin-bottom:8px;">⚡ إرسال إشعار سداد قسط</h3>
+    <p id="modalInstInfo" style="text-align:center; color:#cbd5e1; font-size:14px; margin-top:0;"></p>
+    <div id="modalWalletBox" style="background:#0f172a; border:1px dashed #10b981; border-radius:10px; padding:10px; margin-bottom:14px; font-size:13px; text-align:center; line-height:1.7;"></div>
+
+    <label style="font-size:13px; color:#94a3b8; display:block; margin-bottom:4px;">اختر طريقة التحويل:</label>
+    <select id="payMethodSelect">
+      <option value="فودافون كاش">📱 محفظة فودافون كاش / محافظ إلكترونية</option>
+      <option value="إنستاباي">🏦 إنستاباي (InstaPay)</option>
+    </select>
+
+    <label style="font-size:13px; color:#94a3b8; display:block; margin-bottom:4px;">رقم الموبايل المحول منه (11 رقماً صحيحاً):</label>
+    <input type="tel" id="payWalletInput" maxlength="11" placeholder="مثال: 01012345678" />
+
+    <label style="font-size:13px; color:#94a3b8; display:block; margin-bottom:4px;">رقم العملية المرجعي بالرسالة (اختياري):</label>
+    <input type="text" id="payRefInput" placeholder="آخر 4 أرقام من رقم العملية إن وجد..." />
+
+    <div id="modalErr" style="color:#f87171; font-size:13px; margin-bottom:10px; display:none; text-align:center; font-weight:bold;"></div>
+
+    <div style="display:flex; gap:10px;">
+      <button type="button" id="confirmPayBtn" onclick="submitOnlinePayment()" style="flex:2;">📤 إرسال للمراجعة</button>
+      <button type="button" onclick="closePayModal()" style="flex:1; background:#334155;">إلغاء</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const params = new URLSearchParams(window.location.search);
+const SUPABASE_URL = "https://aqteghoxjvsfpbjpljhp.supabase.co".replace('julful', 'jolful');
+const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFxdGVnaG94anZzZnBianBsamhwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTM3MDg3MjMsImV4cCI6MjEwOTI4NDcyM30.ySdi4eCikrZ4DTHmw7twvB1g49WBqVPoc6gGhg6lMgQ";
+const STORE_ID = params.get('store') || "";
+const headers = {
+  "apikey": SUPABASE_KEY,
+  "Authorization": "Bearer " + SUPABASE_KEY,
+  "Content-Type": "application/json",
+  "Prefer": "return=minimal"
+};
+
+let currentCustomer = null, selectedInstId = null, selectedRemAmount = 0;
+
+function showBanner(txt, isError = false) {
+  const b = document.getElementById('topBanner');
+  b.style.display = 'block';
+  b.style.background = isError ? '#7f1d1d' : '#78350f';
+  b.style.color = isError ? '#fecaca' : '#fde68a';
+  b.style.border = isError ? '1px solid #ef4444' : '1px solid #f59e0b';
+  b.innerText = txt;
+}
+
+function normPhone(p) {
+  let d = (p || '').replace(/\D/g, '');
+  if (d.startsWith('0020')) d = '0' + d.substring(4);
+  else if (d.startsWith('20') && d.length === 12) d = '0' + d.substring(2);
+  return d;
+}
+
+// فحص صارم لرقم المحفظة المصرية (11 رقم يبدأ بـ 010 أو 011 أو 012 أو 015)
+function isValidEgyptianWallet(phoneStr) {
+  const clean = (phoneStr || '').replace(/\s+/g, '');
+  return /^01[0125][0-9]{8}$/.test(clean);
+}
+
+async function lookupCustomer(autoId, autoPhone) {
+  const rawInput = autoPhone || document.getElementById('phoneInput').value.trim();
+  const cleanP = normPhone(rawInput);
+  try {
+    let queryUrl = SUPABASE_URL + "/rest/v1/customers?select=*";
+    if (STORE_ID) queryUrl += "&store_id=eq." + encodeURIComponent(STORE_ID);
+
+    const rCust = await fetch(queryUrl, { headers: { "apikey": SUPABASE_KEY, "Authorization": "Bearer " + SUPABASE_KEY } });
+    const custs = await rCust.json();
+    if (!Array.isArray(custs)) { showBanner("⚠️ تأكد من إعدادات السحابة.", true); return; }
+
+    let found = autoId ? custs.find(c => String(c.id) === String(autoId)) : null;
+    if (!found && cleanP) found = custs.find(c => normPhone(c.phone).includes(cleanP));
+    if (!found) { showBanner("🔍 لم يتم العثور على عميل بهذا الرقم.", true); return; }
+
+    currentCustomer = found;
+    document.getElementById('resultArea').style.display = 'block';
+    document.getElementById('custNameTitle').innerText = "👤 أ/ " + found.name;
+
+    const rInst = await fetch(SUPABASE_URL + "/rest/v1/installments?customer_id=eq." + found.id + "&order=due_date.asc", {
+      headers: { "apikey": SUPABASE_KEY, "Authorization": "Bearer " + SUPABASE_KEY }
+    });
+    const insts = await rInst.json();
+
+    // جلب طلبات الدفع المعلقة (قيد المراجعة) حتى لا يظهر القسط كأنه مدفوع قبل موافقة الإدارة
+    let pendingInstIds = new Set();
+    try {
+      const rQueue = await fetch(SUPABASE_URL + "/rest/v1/mobile_payments_queue?synced_to_desktop=eq.false&select=installment_id", {
+        headers: { "apikey": SUPABASE_KEY, "Authorization": "Bearer " + SUPABASE_KEY }
+      });
+      const qData = await rQueue.json();
+      if (Array.isArray(qData)) qData.forEach(q => pendingInstIds.add(Number(q.installment_id)));
+    } catch(err) {}
+
+    let remCnt = 0, remSum = 0, html = "";
+    insts.forEach((inst, idx) => {
+      const amt = parseFloat(inst.amount || 0), paid = parseFloat(inst.paid_amount || 0), rem = Math.max(0, amt - paid);
+      const isPaid = rem <= 0.01 || inst.status === 'paid';
+      const isPending = !isPaid && (inst.status === 'pending_review' || pendingInstIds.has(Number(inst.id)));
+
+      if (!isPaid) { remCnt++; remSum += rem; }
+
+      let btnHtml = "";
+      let rowClass = "";
+      if (isPaid) {
+        btnHtml = `<span class="badge" style="background:#064e3b; color:#34d399;">✅ تم السداد</span>`;
+      } else if (isPending) {
+        btnHtml = `<span class="badge" style="background:#78350f; color:#fde68a;">⏳ قيد مراجعة الإدارة</span>`;
+        rowClass = "inst-pending";
+      } else {
+        btnHtml = `<button type="button" style="width:auto; padding:8px 14px; font-size:13px;" onclick="openPayModal(${inst.id}, ${rem.toFixed(2)}, '${inst.due_date}')">⚡ دفع القسط (${rem.toFixed(0)} ج.م)</button>`;
+        rowClass = "inst-late";
+      }
+
+      html += `<div class="inst-row ${rowClass}">
+        <div><b>قسط #${idx+1} — ${inst.due_date}</b><br/><span style="font-size:12px; color:#94a3b8;">الإجمالي: ${amt.toFixed(2)} ج.م | المدفوع: ${paid.toFixed(2)} ج.م</span></div>
+        <div>${btnHtml}</div>
+      </div>`;
+    });
+    document.getElementById('remCountVal').innerText = remCnt + " قسط";
+    document.getElementById('remMoneyVal').innerText = remSum.toFixed(0) + " ج.م";
+    document.getElementById('instList').innerHTML = html || "<p>لا توجد أقساط مسجلة.</p>";
+  } catch (e) { showBanner("تعذر الاتصال بالسحابة: " + e.message, true); }
+}
+
+function openPayModal(instId, remAmount, dueDate) {
+  selectedInstId = instId;
+  selectedRemAmount = parseFloat(remAmount);
+  document.getElementById('modalInstInfo').innerHTML = `قسط مستحق بتاريخ <b>${dueDate}</b><br/>المبلغ المطلوب تحويله: <b style="color:#10b981; font-size:18px;">${selectedRemAmount.toFixed(0)} ج.م</b>`;
+  document.getElementById('payWalletInput').value = '';
+  document.getElementById('payRefInput').value = '';
+  document.getElementById('modalErr').style.display = 'none';
+  document.getElementById('payModal').style.display = 'flex';
+}
+
+function closePayModal() { document.getElementById('payModal').style.display = 'none'; }
+
+async function submitOnlinePayment() {
+  const method = document.getElementById('payMethodSelect').value;
+  const walletPhone = document.getElementById('payWalletInput').value.trim();
+  const refNum = document.getElementById('payRefInput').value.trim();
+  const errBox = document.getElementById('modalErr');
+
+  if (!isValidEgyptianWallet(walletPhone)) {
+    errBox.innerText = "⚠️ رقم غير صحيح! يجب إدخال رقم موبايل محفظة مصري صحيح مكون من 11 رقماً يبدأ بـ (010 أو 011 أو 012 أو 015).";
+    errBox.style.display = 'block';
+    return;
+  }
+
+  const btn = document.getElementById('confirmPayBtn');
+  btn.disabled = true; btn.innerText = "⏳ جاري إرسال الطلب للمراجعة...";
+  try {
+    const today = new Date().toISOString().split('T')[0];
+    const details = refNum ? `${method} - محفظة: ${walletPhone} (عملية: ${refNum})` : `${method} - محفظة: ${walletPhone}`;
+
+    // إرسال الطلب لطابور المراجعة فقط دون خصم القسط!
+    const qResp = await fetch(SUPABASE_URL + "/rest/v1/mobile_payments_queue", {
+      method: "POST", headers,
+      body: JSON.stringify({
+        store_id: STORE_ID || (currentCustomer ? currentCustomer.store_id : 'default_store'),
+        installment_id: selectedInstId,
+        customer_name: currentCustomer ? currentCustomer.name : "عميل",
+        paid_amount: selectedRemAmount,
+        paid_date: today,
+        collector_name: details,
+        synced_to_desktop: false
+      })
+    });
+    if (!qResp.ok) throw new Error(await qResp.text());
+
+    // تعليم القسط بأنه "قيد المراجعة" فقط دون تغيير المبلغ المدفوع (يبقى paid_amount كما هو)
+    await fetch(SUPABASE_URL + "/rest/v1/installments?id=eq." + selectedInstId, {
+      method: "PATCH", headers,
+      body: JSON.stringify({ status: "pending_review" })
+    });
+
+    closePayModal();
+    showBanner("⏳ تم إرسال بيانات التحويل للإدارة بنجاح! القسط الآن (قيد المراجعة) وسيتم خصمه فور تأكيد استلام المبلغ.");
+    if (currentCustomer) lookupCustomer(currentCustomer.id, currentCustomer.phone);
+  } catch (e) {
+    errBox.innerText = "❌ خطأ: " + e.message;
+    errBox.style.display = 'block';
+  } finally {
+    btn.disabled = false; btn.innerText = "📤 إرسال للمراجعة";
+  }
+}
+
+window.onload = () => {
+  const sName = params.get('sname') || "I SMILE TECH";
+  const sPhone = params.get('sphone') || "01278922019";
+  const vCash = params.get('vcash') || "01015960391";
+  const iPay = params.get('ipay') || "01278922019";
+
+  document.getElementById('storeTitle').innerText = "🏪 " + sName;
+  document.getElementById('storeSub').innerText = "بوابة متابعة وسداد الأقساط الذكية 📞 " + sPhone;
+  const walletHtml = `💳 <b>أرقام التحويل المعتمدة بالمعرض:</b><br/>📱 فودافون كاش: <b style="color:#10b981;">${vCash}</b> | 🏦 إنستاباي: <b style="color:#f59e0b;">${iPay}</b>`;
+  document.getElementById('payInfoBox').innerHTML = walletHtml;
+  document.getElementById('modalWalletBox').innerHTML = walletHtml;
+
+  if (params.get('id') || params.get('phone')) {
+    if (params.get('phone')) document.getElementById('phoneInput').value = params.get('phone');
+    lookupCustomer(params.get('id'), params.get('phone'));
+  }
+};
+</script>
+</body>
+</html>
